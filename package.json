@@ -11,7 +11,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "lint": "eslint .",
-    "e2e": "playwright test --pass-with-no-tests"
+    "e2e": "playwright test"
   },
   "dependencies": {
     "react": "^19.0.0",
