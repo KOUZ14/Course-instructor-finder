@@ -17,10 +17,10 @@ export function loadDataset(): CourseDataset {
 /**
  * Validates and narrows the bundled JSON fixture to the universal dataset shape.
  */
-function validateCourseDataset(value: unknown): CourseDataset {
+export function validateCourseDataset(value: unknown): CourseDataset {
   const root = assertRecord(value, "dataset");
 
-  return {
+  const parsedDataset: CourseDataset = {
     schools: assertArray(root.schools, "schools").map((school, index) => {
       const row = assertRecord(school, `schools[${index}]`);
 
@@ -92,6 +92,90 @@ function validateCourseDataset(value: unknown): CourseDataset {
       };
     }),
   };
+
+  validateReferences(parsedDataset);
+
+  return parsedDataset;
+}
+
+function validateReferences(dataset: CourseDataset): void {
+  const schoolIds = new Set(dataset.schools.map((school) => school.id));
+  const termsById = new Map(dataset.terms.map((term) => [term.id, term]));
+  const coursesById = new Map(dataset.courses.map((course) => [course.id, course]));
+  const sectionsById = new Map(dataset.sections.map((section) => [section.id, section]));
+  const instructorIds = new Set(dataset.instructors.map((instructor) => instructor.id));
+
+  dataset.courses.forEach((course, index) => {
+    assertReferencedIdExists(schoolIds, course.schoolId, `courses[${index}].schoolId`, "school");
+  });
+
+  dataset.terms.forEach((term, index) => {
+    assertReferencedIdExists(schoolIds, term.schoolId, `terms[${index}].schoolId`, "school");
+  });
+
+  dataset.sections.forEach((section, index) => {
+    assertReferencedIdExists(coursesById, section.courseId, `sections[${index}].courseId`, "course");
+    assertReferencedIdExists(termsById, section.termId, `sections[${index}].termId`, "term");
+  });
+
+  dataset.instructors.forEach((instructor, index) => {
+    assertReferencedIdExists(schoolIds, instructor.schoolId, `instructors[${index}].schoolId`, "school");
+  });
+
+  dataset.teachingAssignments.forEach((assignment, index) => {
+    assertReferencedIdExists(
+      instructorIds,
+      assignment.instructorId,
+      `teachingAssignments[${index}].instructorId`,
+      "instructor",
+    );
+    const section = assertReferencedEntityExists(
+      sectionsById,
+      assignment.sectionId,
+      `teachingAssignments[${index}].sectionId`,
+      "section",
+    );
+    assertReferencedIdExists(coursesById, assignment.courseId, `teachingAssignments[${index}].courseId`, "course");
+    assertReferencedIdExists(termsById, assignment.termId, `teachingAssignments[${index}].termId`, "term");
+
+    if (assignment.courseId !== section.courseId) {
+      throw new Error(
+        `Invalid teachingAssignments[${index}]: courseId ${assignment.courseId} does not match section ${section.id} courseId ${section.courseId}.`,
+      );
+    }
+
+    if (assignment.termId !== section.termId) {
+      throw new Error(
+        `Invalid teachingAssignments[${index}]: termId ${assignment.termId} does not match section ${section.id} termId ${section.termId}.`,
+      );
+    }
+  });
+}
+
+function assertReferencedIdExists(
+  ids: ReadonlySet<string> | ReadonlyMap<string, unknown>,
+  id: string,
+  path: string,
+  entityName: string,
+): void {
+  if (!ids.has(id)) {
+    throw new Error(`Invalid ${path}: ${entityName} id ${id} does not exist.`);
+  }
+}
+
+function assertReferencedEntityExists<T>(
+  records: ReadonlyMap<string, T>,
+  id: string,
+  path: string,
+  entityName: string,
+): T {
+  const record = records.get(id);
+
+  if (!record) {
+    throw new Error(`Invalid ${path}: ${entityName} id ${id} does not exist.`);
+  }
+
+  return record;
 }
 
 function assertRecord(value: unknown, path: string): JsonRecord {
