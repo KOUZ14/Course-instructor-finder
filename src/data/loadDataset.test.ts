@@ -17,11 +17,11 @@ describe("loadDataset", () => {
     const dataset = loadDataset();
 
     expect(dataset.schools).toHaveLength(1);
-    expect(dataset.terms).toHaveLength(2);
-    expect(dataset.courses).toHaveLength(2558);
-    expect(dataset.sections).toHaveLength(6424);
-    expect(dataset.instructors).toHaveLength(2192);
-    expect(dataset.teachingAssignments).toHaveLength(6230);
+    expect(dataset.terms).toHaveLength(27);
+    expect(dataset.courses).toHaveLength(4593);
+    expect(dataset.sections).toHaveLength(87210);
+    expect(dataset.instructors).toHaveLength(5284);
+    expect(dataset.teachingAssignments).toHaveLength(81066);
   });
 
   it("loads bundled records with valid references", () => {

@@ -1,5 +1,5 @@
 import type { CourseDataset, Season } from "../../domain/types";
-import { validateCourseDataset } from "../../data/loadDataset";
+import { validateCourseDataset } from "../../data/validateDataset";
 import { normalizeSjsuScheduleRows, parseSjsuScheduleHtml } from "./normalize";
 
 const SCHOOL_ID = "sjsu";

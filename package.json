@@ -3,10 +3,15 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "start": "node server.mjs",
     "import:sjsu": "vite-node scripts/import-sjsu-dataset.ts",
+    "prepare:public-data": "node scripts/prepare-public-dataset.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

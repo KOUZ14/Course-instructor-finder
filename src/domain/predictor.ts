@@ -19,6 +19,13 @@ interface AssignmentContext {
   score: number;
 }
 
+interface DatasetIndexes {
+  coursesById: Map<string, CourseDataset["courses"][number]>;
+  instructorsById: Map<string, CourseDataset["instructors"][number]>;
+  sectionsById: Map<string, CourseDataset["sections"][number]>;
+  termsById: Map<string, CourseDataset["terms"][number]>;
+}
+
 /**
  * Predicts likely instructors from historical teaching assignments.
  */
@@ -38,7 +45,8 @@ export function predictInstructors(dataset: CourseDataset, query: SearchQuery): 
     };
   }
 
-  const assignments = dataset.teachingAssignments.filter((assignment) => assignmentBelongsToCourse(dataset, assignment, course.id));
+  const indexes = buildDatasetIndexes(dataset);
+  const assignments = dataset.teachingAssignments.filter((assignment) => assignmentBelongsToCourse(indexes, assignment, course.id));
 
   if (assignments.length === 0) {
     return {
@@ -49,7 +57,7 @@ export function predictInstructors(dataset: CourseDataset, query: SearchQuery): 
   }
 
   const contexts = assignments.map((assignment) =>
-    buildAssignmentContext(dataset, assignment, query, targetTerm.season, targetTerm.year),
+    buildAssignmentContext(indexes, assignment, query, targetTerm.season, targetTerm.year),
   );
 
   const byInstructor = new Map<string, PredictionResult>();
@@ -97,16 +105,16 @@ export function predictInstructors(dataset: CourseDataset, query: SearchQuery): 
 }
 
 function buildAssignmentContext(
-  dataset: CourseDataset,
+  indexes: DatasetIndexes,
   assignment: TeachingAssignment,
   query: SearchQuery,
   targetSeason: Season,
   targetYear: number,
 ): AssignmentContext {
-  const section = dataset.sections.find((candidate) => candidate.id === assignment.sectionId);
-  const term = dataset.terms.find((candidate) => candidate.id === assignment.termId);
-  const course = dataset.courses.find((candidate) => candidate.id === assignment.courseId);
-  const instructor = dataset.instructors.find((candidate) => candidate.id === assignment.instructorId);
+  const section = indexes.sectionsById.get(assignment.sectionId);
+  const term = indexes.termsById.get(assignment.termId);
+  const course = indexes.coursesById.get(assignment.courseId);
+  const instructor = indexes.instructorsById.get(assignment.instructorId);
 
   if (!section) throw new Error(`Assignment ${assignment.id} references missing section ${assignment.sectionId}.`);
   if (!term) throw new Error(`Assignment ${assignment.id} references missing term ${assignment.termId}.`);
@@ -184,7 +192,7 @@ function buildAssignmentContext(
 }
 
 function assignmentBelongsToCourse(
-  dataset: CourseDataset,
+  indexes: DatasetIndexes,
   assignment: TeachingAssignment,
   courseId: string,
 ): boolean {
@@ -192,9 +200,18 @@ function assignmentBelongsToCourse(
     return true;
   }
 
-  const section = dataset.sections.find((candidate) => candidate.id === assignment.sectionId);
+  const section = indexes.sectionsById.get(assignment.sectionId);
 
   return section?.courseId === courseId;
+}
+
+function buildDatasetIndexes(dataset: CourseDataset): DatasetIndexes {
+  return {
+    coursesById: new Map(dataset.courses.map((course) => [course.id, course])),
+    instructorsById: new Map(dataset.instructors.map((instructor) => [instructor.id, instructor])),
+    sectionsById: new Map(dataset.sections.map((section) => [section.id, section])),
+    termsById: new Map(dataset.terms.map((term) => [term.id, term])),
+  };
 }
 
 function sameMeetingPattern(left: string[], right: string[]): boolean {

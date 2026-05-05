@@ -20,7 +20,7 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Find likely instructors" }));
 
     expect(screen.getByText("David Taylor")).toBeInTheDocument();
-    expect(screen.getByText("High confidence")).toBeInTheDocument();
+    expect(screen.getAllByText("High confidence").length).toBeGreaterThan(0);
     expect(screen.getByText("Ben Poon")).toBeInTheDocument();
     expect(screen.getByText("Spring 2026: CS 146 section 02, in-person, MW 09:00-10:15")).toBeInTheDocument();
     expect(screen.getAllByText(/Spring 2026/).length).toBeGreaterThan(0);
@@ -65,9 +65,7 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Find likely instructors" }));
 
     expect(
-      screen.getByText(
-        "We could not generate a prediction right now. Target term sjsu-2026-fall is not available in the dataset.",
-      ),
+      screen.getByText("We could not generate a prediction right now. Please try again later."),
     ).toBeInTheDocument();
     expect(screen.queryByText("David Taylor")).not.toBeInTheDocument();
   });

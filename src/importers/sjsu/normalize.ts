@@ -436,7 +436,10 @@ function findScheduleTable(tables: HTMLTableElement[]): ScheduleTableMatch | und
 }
 
 function isPlaceholderInstructor(instructor: string): boolean {
-  const value = instructor.trim().toLowerCase();
+  const value = instructor
+    .trim()
+    .replace(/\s*\/+\s*$/g, "")
+    .toLowerCase();
 
   return value === "" || value === "tba" || value === "staff";
 }
@@ -446,6 +449,10 @@ function normalizeInstructorName(instructor: string): string {
     .split("/")
     .map((name) => name.trim())
     .filter((name) => name.length > 0);
+
+  if (names.length === 1) {
+    return names[0];
+  }
 
   if (names.length > 1 && names.every((name) => name === names[0])) {
     return names[0];

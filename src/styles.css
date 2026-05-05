@@ -125,10 +125,55 @@ h1 {
   font-weight: 750;
 }
 
+.day-field {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.day-field legend {
+  padding: 0;
+}
+
+.day-options {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.day-option {
+  display: grid;
+  place-items: center;
+  min-height: 40px;
+  border: 1px solid #bac4cf;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #243247;
+  cursor: pointer;
+}
+
+.day-option:has(input:checked) {
+  border-color: #0f5b63;
+  background: #e7f4f5;
+}
+
+.day-option input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+}
+
 .field-error {
   color: #a4382f;
   font-size: 0.9rem;
   font-weight: 700;
+}
+
+.release-note {
+  margin: 18px 0 0;
+  color: #586574;
+  font-size: 0.92rem;
 }
 
 .empty-state {
