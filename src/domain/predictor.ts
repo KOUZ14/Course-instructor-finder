@@ -33,12 +33,12 @@ export function predictInstructors(dataset: CourseDataset, query: SearchQuery): 
     };
   }
 
-  const targetTerm = dataset.terms.find((term) => term.id === query.termId);
+  const targetTerm = dataset.terms.find((term) => term.id === query.termId && term.schoolId === query.schoolId);
   if (!targetTerm) {
     throw new Error(`Target term ${query.termId} is not available in the dataset.`);
   }
 
-  const assignments = dataset.teachingAssignments.filter((assignment) => assignment.courseId === course.id);
+  const assignments = dataset.teachingAssignments.filter((assignment) => assignmentBelongsToCourse(dataset, assignment, course.id));
 
   if (assignments.length === 0) {
     return {
@@ -181,6 +181,20 @@ function buildAssignmentContext(
       endTime: section.endTime,
     },
   };
+}
+
+function assignmentBelongsToCourse(
+  dataset: CourseDataset,
+  assignment: TeachingAssignment,
+  courseId: string,
+): boolean {
+  if (assignment.courseId === courseId) {
+    return true;
+  }
+
+  const section = dataset.sections.find((candidate) => candidate.id === assignment.sectionId);
+
+  return section?.courseId === courseId;
 }
 
 function sameMeetingPattern(left: string[], right: string[]): boolean {

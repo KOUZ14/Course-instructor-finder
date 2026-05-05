@@ -73,6 +73,27 @@ describe("predictInstructors", () => {
     ).toThrow("Target term sjsu-2099-fall is not available in the dataset.");
   });
 
+  it("throws an explicit error when the target term belongs to another school", () => {
+    const dataset = loadDataset();
+
+    expect(() =>
+      predictInstructors(
+        {
+          ...dataset,
+          terms: dataset.terms.map((term) =>
+            term.id === "sjsu-2026-fall" ? { ...term, schoolId: "other-school" } : term,
+          ),
+        },
+        {
+          schoolId: "sjsu",
+          termId: "sjsu-2026-fall",
+          subject: "CS",
+          courseNumber: "146",
+        },
+      ),
+    ).toThrow("Target term sjsu-2026-fall is not available in the dataset.");
+  });
+
   it("throws an explicit error for an absent target term before checking assignment availability", () => {
     const dataset = loadDataset();
 
@@ -157,6 +178,50 @@ describe("predictInstructors", () => {
         },
       ),
     ).toThrow("Assignment ta-cs146-fall2025-01 references missing instructor missing-instructor.");
+  });
+
+  it("throws an explicit error when a searched-course section has an assignment with a missing course", () => {
+    const dataset = loadDataset();
+
+    expect(() =>
+      predictInstructors(
+        {
+          ...dataset,
+          teachingAssignments: dataset.teachingAssignments.map((assignment) =>
+            assignment.id === "ta-cs146-fall2025-01" ? { ...assignment, courseId: "missing-course" } : assignment,
+          ),
+        },
+        {
+          schoolId: "sjsu",
+          termId: "sjsu-2026-fall",
+          subject: "CS",
+          courseNumber: "146",
+        },
+      ),
+    ).toThrow("Assignment ta-cs146-fall2025-01 references missing course missing-course.");
+  });
+
+  it("throws an explicit error when a searched-course section has an assignment with the wrong course", () => {
+    const dataset = loadDataset();
+
+    expect(() =>
+      predictInstructors(
+        {
+          ...dataset,
+          teachingAssignments: dataset.teachingAssignments.map((assignment) =>
+            assignment.id === "ta-cs146-fall2025-01" ? { ...assignment, courseId: "sjsu-cs-151" } : assignment,
+          ),
+        },
+        {
+          schoolId: "sjsu",
+          termId: "sjsu-2026-fall",
+          subject: "CS",
+          courseNumber: "146",
+        },
+      ),
+    ).toThrow(
+      "Assignment ta-cs146-fall2025-01 references section sjsu-cs-146-2025-fall-01 with courseId sjsu-cs-146, but assignment courseId is sjsu-cs-151.",
+    );
   });
 
   it("throws an explicit error when assignment and section course ids differ", () => {
