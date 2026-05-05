@@ -1,15 +1,16 @@
+import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./styles.css";
 
-const rootElement = document.getElementById("root");
+const root = document.getElementById("root");
 
-if (!rootElement) {
-  throw new Error("Expected root element with id 'root' to exist.");
+if (!root) {
+  throw new Error("Root element #root was not found.");
 }
 
-// Placeholder entrypoint for the Task 1 scaffold. Task 6 replaces this with
-// the real React application shell.
-createRoot(rootElement).render(
-  <main>
-    <h1>Course Instructor Finder</h1>
-  </main>,
+createRoot(root).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
 );
