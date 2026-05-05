@@ -26,6 +26,12 @@ npm run build
 npm run e2e
 ```
 
+For fresh environments, install Playwright browsers before running e2e tests:
+
+```bash
+npx playwright install
+```
+
 ## MVP Scope
 
 - Student-facing course-first search.
