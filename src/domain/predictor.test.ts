@@ -73,6 +73,17 @@ describe("predictInstructors", () => {
     ).toThrow("Target term sjsu-2099-fall is not available in the dataset.");
   });
 
+  it("throws an explicit error for an absent target term before checking course availability", () => {
+    expect(() =>
+      predictInstructors(loadDataset(), {
+        schoolId: "sjsu",
+        termId: "sjsu-2099-fall",
+        subject: "MATH",
+        courseNumber: "999",
+      }),
+    ).toThrow("Target term sjsu-2099-fall is not available in the dataset.");
+  });
+
   it("throws an explicit error when the target term belongs to another school", () => {
     const dataset = loadDataset();
 

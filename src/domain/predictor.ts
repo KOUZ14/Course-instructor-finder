@@ -23,6 +23,11 @@ interface AssignmentContext {
  * Predicts likely instructors from historical teaching assignments.
  */
 export function predictInstructors(dataset: CourseDataset, query: SearchQuery): PredictionResponse {
+  const targetTerm = dataset.terms.find((term) => term.id === query.termId && term.schoolId === query.schoolId);
+  if (!targetTerm) {
+    throw new Error(`Target term ${query.termId} is not available in the dataset.`);
+  }
+
   const course = findCourse(dataset, query.schoolId, query.subject, query.courseNumber);
 
   if (!course) {
@@ -31,11 +36,6 @@ export function predictInstructors(dataset: CourseDataset, query: SearchQuery): 
       reason: "course_not_found",
       message: `${query.subject} ${query.courseNumber} is not available in the current dataset.`,
     };
-  }
-
-  const targetTerm = dataset.terms.find((term) => term.id === query.termId && term.schoolId === query.schoolId);
-  if (!targetTerm) {
-    throw new Error(`Target term ${query.termId} is not available in the dataset.`);
   }
 
   const assignments = dataset.teachingAssignments.filter((assignment) => assignmentBelongsToCourse(dataset, assignment, course.id));
