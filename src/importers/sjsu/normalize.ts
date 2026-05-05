@@ -47,13 +47,26 @@ export interface NormalizedSjsuRows {
 export function parseSjsuScheduleHtml(html: string): SjsuScheduleRow[] {
   const parser = new DOMParser();
   const document = parser.parseFromString(html, "text/html");
-  const rows = [...document.querySelectorAll("tbody tr")];
+  const tables = [...document.querySelectorAll("table")];
+  const table = findScheduleTable(tables);
+
+  if (!table) {
+    if (tables.length === 0) {
+      throw new Error("Expected an SJSU schedule table with rows, but none were found.");
+    }
+
+    if (tables.some((candidate) => candidate.querySelectorAll("thead th").length > 0)) {
+      throw new Error(`Expected SJSU schedule headers ${EXPECTED_HEADERS.join(", ")}.`);
+    }
+
+    throw new Error(`Expected an SJSU schedule table with headers ${EXPECTED_HEADERS.join(", ")}.`);
+  }
+
+  const rows = [...table.querySelectorAll("tbody tr")];
 
   if (rows.length === 0) {
     throw new Error("Expected an SJSU schedule table with rows, but none were found.");
   }
-
-  validateScheduleHeaders(rows[0]);
 
   return rows.map((row) => {
     const cells = [...row.querySelectorAll("td")].map((cell) => cell.textContent?.trim() ?? "");
@@ -251,23 +264,15 @@ function parseTimePart(value: string, original: string): string {
   return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 }
 
-function validateScheduleHeaders(row: Element): void {
-  const table = row.closest("table");
-  const headers = table
-    ? [...table.querySelectorAll("thead th")].map((header) => header.textContent?.trim() ?? "")
-    : [];
+function findScheduleTable(tables: HTMLTableElement[]): HTMLTableElement | undefined {
+  return tables.find((table) => {
+    const headers = [...table.querySelectorAll("thead th")].map((header) => header.textContent?.trim() ?? "");
 
-  if (headers.length === 0) {
-    return;
-  }
-
-  const matchesExpectedHeaders =
-    headers.length === EXPECTED_HEADERS.length &&
-    EXPECTED_HEADERS.every((expectedHeader, index) => headers[index] === expectedHeader);
-
-  if (!matchesExpectedHeaders) {
-    throw new Error(`Expected SJSU schedule headers ${EXPECTED_HEADERS.join(", ")}.`);
-  }
+    return (
+      headers.length === EXPECTED_HEADERS.length &&
+      EXPECTED_HEADERS.every((expectedHeader, index) => headers[index] === expectedHeader)
+    );
+  });
 }
 
 function isPlaceholderInstructor(instructor: string): boolean {

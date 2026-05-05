@@ -45,6 +45,100 @@ describe("parseSjsuScheduleHtml", () => {
       "Expected SJSU schedule headers Class Nbr, Subject, Catalog, Section, Title, Component, Mode, Days, Time, Location, Instructor.",
     );
   });
+
+  it("ignores unrelated tables and parses only the schedule table", () => {
+    const html = `
+      <table>
+        <thead><tr><th>Label</th></tr></thead>
+        <tbody><tr><td>Not a schedule row</td></tr></tbody>
+      </table>
+      <table>
+        <thead>
+          <tr>
+            <th>Class Nbr</th>
+            <th>Subject</th>
+            <th>Catalog</th>
+            <th>Section</th>
+            <th>Title</th>
+            <th>Component</th>
+            <th>Mode</th>
+            <th>Days</th>
+            <th>Time</th>
+            <th>Location</th>
+            <th>Instructor</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>48291</td>
+            <td>CS</td>
+            <td>146</td>
+            <td>01</td>
+            <td>Data Structures and Algorithms</td>
+            <td>Lecture</td>
+            <td>In Person</td>
+            <td>MW</td>
+            <td>09:00-10:15</td>
+            <td>MacQuarrie Hall</td>
+            <td>Taylor Nguyen</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    expect(parseSjsuScheduleHtml(html)).toHaveLength(1);
+  });
+
+  it("throws an explicit error for a headerless 11-cell table", () => {
+    const html = `
+      <table>
+        <tbody>
+          <tr>
+            <td>48291</td>
+            <td>CS</td>
+            <td>146</td>
+            <td>01</td>
+            <td>Data Structures and Algorithms</td>
+            <td>Lecture</td>
+            <td>In Person</td>
+            <td>MW</td>
+            <td>09:00-10:15</td>
+            <td>MacQuarrie Hall</td>
+            <td>Taylor Nguyen</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    expect(() => parseSjsuScheduleHtml(html)).toThrow(
+      "Expected an SJSU schedule table with headers Class Nbr, Subject, Catalog, Section, Title, Component, Mode, Days, Time, Location, Instructor.",
+    );
+  });
+
+  it("throws an explicit error when a schedule row has the wrong column count", () => {
+    const html = `
+      <table>
+        <thead>
+          <tr>
+            <th>Class Nbr</th>
+            <th>Subject</th>
+            <th>Catalog</th>
+            <th>Section</th>
+            <th>Title</th>
+            <th>Component</th>
+            <th>Mode</th>
+            <th>Days</th>
+            <th>Time</th>
+            <th>Location</th>
+            <th>Instructor</th>
+          </tr>
+        </thead>
+        <tbody><tr><td>48291</td><td>CS</td></tr></tbody>
+      </table>
+    `;
+
+    expect(() => parseSjsuScheduleHtml(html)).toThrow("Expected 11 schedule columns, received 2.");
+  });
 });
 
 describe("normalizeSjsuScheduleRows", () => {
