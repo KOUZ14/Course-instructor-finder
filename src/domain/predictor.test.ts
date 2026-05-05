@@ -73,6 +73,25 @@ describe("predictInstructors", () => {
     ).toThrow("Target term sjsu-2099-fall is not available in the dataset.");
   });
 
+  it("throws an explicit error for an absent target term before checking assignment availability", () => {
+    const dataset = loadDataset();
+
+    expect(() =>
+      predictInstructors(
+        {
+          ...dataset,
+          teachingAssignments: dataset.teachingAssignments.filter((assignment) => assignment.courseId !== "sjsu-cs-151"),
+        },
+        {
+          schoolId: "sjsu",
+          termId: "sjsu-2099-fall",
+          subject: "CS",
+          courseNumber: "151",
+        },
+      ),
+    ).toThrow("Target term sjsu-2099-fall is not available in the dataset.");
+  });
+
   it("throws an explicit error when an assignment references a missing section", () => {
     const dataset = loadDataset();
     const assignment = dataset.teachingAssignments.find((candidate) => candidate.id === "ta-cs146-fall2025-01");

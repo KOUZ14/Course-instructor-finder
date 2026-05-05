@@ -33,6 +33,11 @@ export function predictInstructors(dataset: CourseDataset, query: SearchQuery): 
     };
   }
 
+  const targetTerm = dataset.terms.find((term) => term.id === query.termId);
+  if (!targetTerm) {
+    throw new Error(`Target term ${query.termId} is not available in the dataset.`);
+  }
+
   const assignments = dataset.teachingAssignments.filter((assignment) => assignment.courseId === course.id);
 
   if (assignments.length === 0) {
@@ -41,11 +46,6 @@ export function predictInstructors(dataset: CourseDataset, query: SearchQuery): 
       reason: "no_historical_instructor_data",
       message: `${course.subject} ${course.number} exists, but there is no historical instructor data for it yet.`,
     };
-  }
-
-  const targetTerm = dataset.terms.find((term) => term.id === query.termId);
-  if (!targetTerm) {
-    throw new Error(`Target term ${query.termId} is not available in the dataset.`);
   }
 
   const contexts = assignments.map((assignment) =>
