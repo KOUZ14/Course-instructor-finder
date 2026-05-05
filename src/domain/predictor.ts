@@ -6,6 +6,7 @@ import type {
   PredictionResult,
   ScoreFactors,
   SearchQuery,
+  Season,
   TeachingAssignment,
 } from "./types";
 
@@ -14,8 +15,6 @@ const MINIMUM_SCORE = 45;
 interface AssignmentContext {
   assignment: TeachingAssignment;
   evidence: EvidenceRow;
-  termYear: number;
-  termSeason: string;
   factors: ScoreFactors;
   score: number;
 }
@@ -45,11 +44,13 @@ export function predictInstructors(dataset: CourseDataset, query: SearchQuery): 
   }
 
   const targetTerm = dataset.terms.find((term) => term.id === query.termId);
-  const contexts = assignments
-    .map((assignment) =>
-      buildAssignmentContext(dataset, assignment, query, targetTerm?.season ?? "fall", targetTerm?.year ?? 2026),
-    )
-    .filter((context): context is AssignmentContext => context !== undefined);
+  if (!targetTerm) {
+    throw new Error(`Target term ${query.termId} is not available in the dataset.`);
+  }
+
+  const contexts = assignments.map((assignment) =>
+    buildAssignmentContext(dataset, assignment, query, targetTerm.season, targetTerm.year),
+  );
 
   const byInstructor = new Map<string, PredictionResult>();
 
@@ -102,16 +103,19 @@ function buildAssignmentContext(
   dataset: CourseDataset,
   assignment: TeachingAssignment,
   query: SearchQuery,
-  targetSeason: string,
+  targetSeason: Season,
   targetYear: number,
-): AssignmentContext | undefined {
+): AssignmentContext {
   const section = dataset.sections.find((candidate) => candidate.id === assignment.sectionId);
   const term = dataset.terms.find((candidate) => candidate.id === assignment.termId);
   const course = dataset.courses.find((candidate) => candidate.id === assignment.courseId);
   const instructor = dataset.instructors.find((candidate) => candidate.id === assignment.instructorId);
 
-  if (!section || !term || !course || !instructor) {
-    return undefined;
+  if (!section) throw new Error(`Assignment ${assignment.id} references missing section ${assignment.sectionId}.`);
+  if (!term) throw new Error(`Assignment ${assignment.id} references missing term ${assignment.termId}.`);
+  if (!course) throw new Error(`Assignment ${assignment.id} references missing course ${assignment.courseId}.`);
+  if (!instructor) {
+    throw new Error(`Assignment ${assignment.id} references missing instructor ${assignment.instructorId}.`);
   }
 
   const yearsOld = Math.max(0, targetYear - term.year);
@@ -141,8 +145,6 @@ function buildAssignmentContext(
 
   return {
     assignment,
-    termYear: term.year,
-    termSeason: term.season,
     factors,
     score,
     evidence: {
@@ -153,7 +155,7 @@ function buildAssignmentContext(
       sectionNumber: section.sectionNumber,
       componentType: section.componentType,
       mode: section.mode,
-      days: section.days,
+      days: [...section.days],
       startTime: section.startTime,
       endTime: section.endTime,
     },
@@ -161,7 +163,25 @@ function buildAssignmentContext(
 }
 
 function sameMeetingPattern(left: string[], right: string[]): boolean {
-  return left.length === right.length && left.every((day) => right.includes(day));
+  const leftDays = normalizedDaySet(left);
+  const rightDays = normalizedDaySet(right);
+
+  if (!leftDays || !rightDays || leftDays.size !== rightDays.size) {
+    return false;
+  }
+
+  return [...leftDays].every((day) => rightDays.has(day));
+}
+
+function normalizedDaySet(days: string[]): Set<string> | undefined {
+  const normalizedDays = days.map((day) => day.trim().toUpperCase()).filter((day) => day.length > 0);
+  const uniqueDays = new Set(normalizedDays);
+
+  if (uniqueDays.size !== normalizedDays.length) {
+    return undefined;
+  }
+
+  return uniqueDays;
 }
 
 function confidenceFor(score: number, evidenceCount: number): "High" | "Medium" | "Low" {
