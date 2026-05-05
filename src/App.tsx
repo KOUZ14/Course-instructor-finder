@@ -2,7 +2,7 @@ import { type FormEvent, useMemo, useState } from "react";
 import { loadDataset } from "./data/loadDataset";
 import { predictInstructors } from "./domain/predictor";
 import { parseSearchInput, type SearchValidationErrors } from "./domain/search";
-import type { EvidenceRow, MeetingMode, PredictionResponse } from "./domain/types";
+import type { EvidenceRow, MeetingMode, PredictionResponse, ScoreFactors } from "./domain/types";
 
 const DEFAULT_SCHOOL_ID = "sjsu";
 const DEFAULT_TERM_ID = "sjsu-2026-fall";
@@ -22,7 +22,21 @@ const meetingModeOptions: { value: MeetingMode | ""; label: string }[] = [
   { value: "hybrid", label: "Hybrid" },
 ];
 
+const coursePresets = [
+  { subject: "CS", courseNumber: "146", label: "CS 146" },
+  { subject: "CS", courseNumber: "157A", label: "CS 157A" },
+  { subject: "CS", courseNumber: "151", label: "CS 151" },
+] as const;
+
 const selectableMeetingModes = new Set<MeetingMode>(["in-person", "online", "hybrid", "unknown"]);
+const factorLabels: Record<keyof ScoreFactors, string> = {
+  sameCourse: "Same course",
+  recency: "Recent history",
+  seasonMatch: "Same season",
+  componentMatch: "Component",
+  modeMatch: "Format",
+  meetingPatternMatch: "Schedule fit",
+};
 
 /**
  * Renders the student-facing course search and instructor prediction results.
@@ -83,106 +97,140 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <section className="search-panel" aria-labelledby="page-title">
-        <p className="app-kicker">San Jose State University</p>
-        <h1 id="page-title">Find likely instructors when none are listed.</h1>
-        <p className="intro-copy">
-          Search public historical schedule data for teaching patterns and transparent evidence.
-        </p>
+      <section className="hero-panel reveal-block" aria-labelledby="page-title">
+        <nav className="nav-island" aria-label="Product">
+          <span className="brand-mark">CIF</span>
+          <span>Course Instructor Finder</span>
+        </nav>
 
-        <form className="search-form" onSubmit={handleSubmit}>
-          <label className="form-field">
-            <span>School</span>
-            <select value={DEFAULT_SCHOOL_ID} disabled>
-              <option value={DEFAULT_SCHOOL_ID}>San Jose State University</option>
-            </select>
-          </label>
+        <div className="hero-copy">
+          <h1 id="page-title">Find likely instructors before registration.</h1>
+          <p className="intro-copy">Search a course and compare the historical evidence behind each prediction.</p>
+        </div>
+      </section>
 
-          <label className="form-field">
-            <span>Term</span>
-            <select value={termId} onChange={(event) => setTermId(event.target.value)}>
-              {termOptions.map((term) => (
-                <option key={term.id} value={term.id}>
-                  {term.label}
-                </option>
-              ))}
-            </select>
-          </label>
+      <div className={`workbench ${response || predictionError ? "workbench-has-output" : ""}`}>
+        <section className="search-panel reveal-block" aria-labelledby="search-title">
+          <div className="panel-shell">
+            <div className="panel-core">
+              <div className="panel-heading">
+                <p className="panel-eyebrow">Class lookup</p>
+                <h2 id="search-title">Start with the course</h2>
+                <p>Use a preset or type your class, then add the meeting pattern if you know it.</p>
+              </div>
 
-          <label className="form-field">
-            <span>Subject</span>
-            <input
-              aria-describedby={errors.subject ? "subject-error" : undefined}
-              aria-invalid={Boolean(errors.subject)}
-              value={subject}
-              onChange={(event) => setSubject(event.target.value)}
-            />
-            {errors.subject ? (
-              <span className="field-error" id="subject-error" role="alert">
-                {errors.subject}
-              </span>
-            ) : null}
-          </label>
-
-          <label className="form-field">
-            <span>Course number</span>
-            <input
-              aria-describedby={errors.courseNumber ? "course-number-error" : undefined}
-              aria-invalid={Boolean(errors.courseNumber)}
-              value={courseNumber}
-              onChange={(event) => setCourseNumber(event.target.value)}
-            />
-            {errors.courseNumber ? (
-              <span className="field-error" id="course-number-error" role="alert">
-                {errors.courseNumber}
-              </span>
-            ) : null}
-          </label>
-
-          <label className="form-field">
-            <span>Mode</span>
-            <select value={mode} onChange={(event) => setMode(parseModeSelectValue(event.target.value))}>
-              {meetingModeOptions.map((option) => (
-                <option key={option.value || "any"} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <fieldset className="form-field day-field">
-            <legend>Meeting days</legend>
-            <div className="day-options">
-              {dayOptions.map((day) => (
-                <label className="day-option" key={day}>
-                  <input
-                    checked={selectedDays.includes(day)}
-                    type="checkbox"
-                    value={day}
-                    onChange={() => setSelectedDays(toggleDay(selectedDays, day))}
-                  />
-                  <span>{day}</span>
+              <form className="search-form" onSubmit={handleSubmit}>
+                <label className="form-field optional-mobile-field">
+                  <span>Term</span>
+                  <select value={termId} onChange={(event) => setTermId(event.target.value)}>
+                    {termOptions.map((term) => (
+                      <option key={term.id} value={term.id}>
+                        {term.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-              ))}
+
+                <div className="course-row">
+                  <label className="form-field">
+                    <span>Subject</span>
+                    <input
+                      aria-describedby={errors.subject ? "subject-error" : undefined}
+                      aria-invalid={Boolean(errors.subject)}
+                      value={subject}
+                      onChange={(event) => setSubject(event.target.value)}
+                    />
+                    {errors.subject ? (
+                      <span className="field-error" id="subject-error" role="alert">
+                        {errors.subject}
+                      </span>
+                    ) : null}
+                  </label>
+
+                  <label className="form-field">
+                    <span>Course number</span>
+                    <input
+                      aria-describedby={errors.courseNumber ? "course-number-error" : undefined}
+                      aria-invalid={Boolean(errors.courseNumber)}
+                      value={courseNumber}
+                      onChange={(event) => setCourseNumber(event.target.value)}
+                    />
+                    {errors.courseNumber ? (
+                      <span className="field-error" id="course-number-error" role="alert">
+                        {errors.courseNumber}
+                      </span>
+                    ) : null}
+                  </label>
+                </div>
+
+                <div className="preset-row optional-mobile-field" aria-label="Popular course presets">
+                  {coursePresets.map((preset) => (
+                    <button
+                      className="preset-chip"
+                      key={preset.label}
+                      type="button"
+                      onClick={() => {
+                        setSubject(preset.subject);
+                        setCourseNumber(preset.courseNumber);
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                <label className="form-field optional-mobile-field">
+                  <span>Mode</span>
+                  <select value={mode} onChange={(event) => setMode(parseModeSelectValue(event.target.value))}>
+                    {meetingModeOptions.map((option) => (
+                      <option key={option.value || "any"} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <fieldset className="form-field day-field optional-mobile-field">
+                  <legend>Meeting days</legend>
+                  <div className="day-options">
+                    {dayOptions.map((day) => (
+                      <label className="day-option" key={day}>
+                        <input
+                          checked={selectedDays.includes(day)}
+                          type="checkbox"
+                          value={day}
+                          onChange={() => setSelectedDays(toggleDay(selectedDays, day))}
+                        />
+                        <span>{day}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                <label className="form-field optional-mobile-field">
+                  <span>Start time</span>
+                  <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+                </label>
+
+                <button className="primary-action" type="submit">
+                  <span>Find likely instructors</span>
+                  <span aria-hidden="true" className="button-orbit">
+                    →
+                  </span>
+                </button>
+              </form>
             </div>
-          </fieldset>
+          </div>
+        </section>
 
-          <label className="form-field">
-            <span>Start time</span>
-            <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
-          </label>
-
-          <button type="submit">Find likely instructors</button>
-        </form>
-
-        <p className="release-note">
-          Predictions are estimates from public historical schedule data. They are not official assignments or guarantees.
-        </p>
-      </section>
-
-      <section className="results-panel" aria-live="polite" aria-label="Prediction results">
-        <ResultsContent predictionError={predictionError} response={response} />
-      </section>
+        <section className="results-panel reveal-block" aria-live="polite" aria-label="Prediction results">
+          <div className="panel-shell results-shell">
+            <div className="panel-core results-core">
+              <ResultsContent predictionError={predictionError} response={response} />
+            </div>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
@@ -199,32 +247,61 @@ function ResultsContent({
 }) {
   if (predictionError) {
     return (
-      <p className="empty-state error-state" role="alert">
-        {predictionError}
-      </p>
+      <div className="empty-state error-state" role="alert">
+        <p className="panel-eyebrow">Prediction unavailable</p>
+        <h2>Something blocked this search.</h2>
+        <p>{predictionError}</p>
+      </div>
     );
   }
 
   if (!response) {
     return (
-      <p className="empty-state">Search for a course to see likely instructors and the evidence behind each result.</p>
+      <div className="empty-state">
+        <p className="panel-eyebrow">Ready when you are</p>
+        <h2>Search results will land here.</h2>
+        <p>Run a course search to see likely instructors, confidence, score factors, and the evidence behind each result.</p>
+      </div>
     );
   }
 
   if (response.status === "empty") {
-    return <p className="empty-state">{response.message}</p>;
+    return (
+      <div className="empty-state">
+        <p className="panel-eyebrow">No match</p>
+        <h2>No prediction available yet.</h2>
+        <p>{response.message}</p>
+      </div>
+    );
   }
 
   return (
     <div className="results-list">
-      {response.results.map((result) => (
-        <article className="result-card" key={result.instructorId}>
+      <div className="results-summary">
+        <div>
+          <p className="panel-eyebrow">Best bets</p>
+          <h2>{response.results.length} possible instructor{response.results.length === 1 ? "" : "s"}</h2>
+        </div>
+        <p>Ranked by course history, recency, format, and meeting-pattern fit.</p>
+      </div>
+
+      {response.results.map((result, index) => (
+        <article className={`result-card ${index === 0 ? "top-result" : ""}`} key={result.instructorId}>
           <div className="result-header">
             <div>
+              {index === 0 ? <p className="result-rank">Most likely</p> : null}
               <h2>{result.instructorName}</h2>
-              <p className="confidence">{result.confidence} confidence</p>
+              <p className={`confidence confidence-${result.confidence.toLowerCase()}`}>{result.confidence} confidence</p>
             </div>
             <p className="score">Score: {result.score}</p>
+          </div>
+
+          <div className="factor-list" aria-label={`Score factors for ${result.instructorName}`}>
+            {formatScoreFactors(result.factors).map((factor) => (
+              <span key={factor.label}>
+                {factor.label}: {factor.value}
+              </span>
+            ))}
           </div>
 
           <h3>Evidence</h3>
@@ -258,6 +335,16 @@ function formatTimeRange(startTime: string | undefined, endTime: string | undefi
   if (startTime) return ` starts ${startTime}`;
 
   return ` ends ${endTime}`;
+}
+
+/**
+ * Converts score factors into labeled, whole-number chips for quick scanning.
+ */
+function formatScoreFactors(factors: ScoreFactors): { label: string; value: number }[] {
+  return Object.entries(factors).map(([key, value]) => ({
+    label: factorLabels[key as keyof ScoreFactors],
+    value,
+  }));
 }
 
 /**
