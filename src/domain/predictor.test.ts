@@ -115,6 +115,144 @@ describe("predictInstructors", () => {
     ).toThrow(`Assignment ${assignment.id} references missing section ${assignment.sectionId}.`);
   });
 
+  it("throws an explicit error when an assignment references a missing term", () => {
+    const dataset = loadDataset();
+
+    expect(() =>
+      predictInstructors(
+        {
+          ...dataset,
+          teachingAssignments: dataset.teachingAssignments.map((assignment) =>
+            assignment.id === "ta-cs146-fall2025-01" ? { ...assignment, termId: "missing-term" } : assignment,
+          ),
+        },
+        {
+          schoolId: "sjsu",
+          termId: "sjsu-2026-fall",
+          subject: "CS",
+          courseNumber: "146",
+        },
+      ),
+    ).toThrow("Assignment ta-cs146-fall2025-01 references missing term missing-term.");
+  });
+
+  it("throws an explicit error when an assignment references a missing instructor", () => {
+    const dataset = loadDataset();
+
+    expect(() =>
+      predictInstructors(
+        {
+          ...dataset,
+          teachingAssignments: dataset.teachingAssignments.map((assignment) =>
+            assignment.id === "ta-cs146-fall2025-01"
+              ? { ...assignment, instructorId: "missing-instructor" }
+              : assignment,
+          ),
+        },
+        {
+          schoolId: "sjsu",
+          termId: "sjsu-2026-fall",
+          subject: "CS",
+          courseNumber: "146",
+        },
+      ),
+    ).toThrow("Assignment ta-cs146-fall2025-01 references missing instructor missing-instructor.");
+  });
+
+  it("throws an explicit error when assignment and section course ids differ", () => {
+    const dataset = loadDataset();
+
+    expect(() =>
+      predictInstructors(
+        {
+          ...dataset,
+          sections: dataset.sections.map((section) =>
+            section.id === "sjsu-cs-146-2025-fall-01" ? { ...section, courseId: "sjsu-cs-151" } : section,
+          ),
+        },
+        {
+          schoolId: "sjsu",
+          termId: "sjsu-2026-fall",
+          subject: "CS",
+          courseNumber: "146",
+        },
+      ),
+    ).toThrow(
+      "Assignment ta-cs146-fall2025-01 references section sjsu-cs-146-2025-fall-01 with courseId sjsu-cs-151, but assignment courseId is sjsu-cs-146.",
+    );
+  });
+
+  it("throws an explicit error when assignment and section term ids differ", () => {
+    const dataset = loadDataset();
+
+    expect(() =>
+      predictInstructors(
+        {
+          ...dataset,
+          sections: dataset.sections.map((section) =>
+            section.id === "sjsu-cs-146-2025-fall-01" ? { ...section, termId: "sjsu-2025-spring" } : section,
+          ),
+        },
+        {
+          schoolId: "sjsu",
+          termId: "sjsu-2026-fall",
+          subject: "CS",
+          courseNumber: "146",
+        },
+      ),
+    ).toThrow(
+      "Assignment ta-cs146-fall2025-01 references section sjsu-cs-146-2025-fall-01 with termId sjsu-2025-spring, but assignment termId is sjsu-2025-fall.",
+    );
+  });
+
+  it("throws an explicit error when referenced course and term schools differ", () => {
+    const dataset = loadDataset();
+
+    expect(() =>
+      predictInstructors(
+        {
+          ...dataset,
+          terms: dataset.terms.map((term) =>
+            term.id === "sjsu-2025-fall" ? { ...term, schoolId: "other-school" } : term,
+          ),
+        },
+        {
+          schoolId: "sjsu",
+          termId: "sjsu-2026-fall",
+          subject: "CS",
+          courseNumber: "146",
+        },
+      ),
+    ).toThrow(
+      "Assignment ta-cs146-fall2025-01 references course sjsu-cs-146 from school sjsu and term sjsu-2025-fall from school other-school.",
+    );
+  });
+
+  it("throws an explicit error when referenced course and instructor schools differ", () => {
+    const dataset = loadDataset();
+
+    expect(() =>
+      predictInstructors(
+        {
+          ...dataset,
+          instructors: dataset.instructors.map((instructor) =>
+            instructor.id === "sjsu-instructor-taylor-nguyen"
+              ? { ...instructor, schoolId: "other-school" }
+              : instructor,
+          ),
+        },
+        {
+          schoolId: "sjsu",
+          termId: "sjsu-2026-fall",
+          subject: "CS",
+          courseNumber: "146",
+        },
+      ),
+    ).toThrow(
+      "Assignment ta-cs146-fall2025-01 references course sjsu-cs-146 from school sjsu and instructor sjsu-instructor-taylor-nguyen from school other-school.",
+    );
+  });
+
   it("returns cloned evidence days so result mutation does not mutate the dataset", () => {
     const dataset = loadDataset();
     const response = predictInstructors(dataset, {

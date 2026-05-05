@@ -55,14 +55,11 @@ export function predictInstructors(dataset: CourseDataset, query: SearchQuery): 
   const byInstructor = new Map<string, PredictionResult>();
 
   for (const context of contexts) {
-    const instructor = dataset.instructors.find((candidate) => candidate.id === context.assignment.instructorId);
-    if (!instructor) continue;
-
-    const existing = byInstructor.get(instructor.id);
+    const existing = byInstructor.get(context.assignment.instructorId);
     if (!existing) {
-      byInstructor.set(instructor.id, {
-        instructorId: instructor.id,
-        instructorName: instructor.displayName,
+      byInstructor.set(context.assignment.instructorId, {
+        instructorId: context.assignment.instructorId,
+        instructorName: context.evidence.instructorName,
         score: context.score,
         confidence: "Low",
         factors: context.factors,
@@ -116,6 +113,30 @@ function buildAssignmentContext(
   if (!course) throw new Error(`Assignment ${assignment.id} references missing course ${assignment.courseId}.`);
   if (!instructor) {
     throw new Error(`Assignment ${assignment.id} references missing instructor ${assignment.instructorId}.`);
+  }
+
+  if (section.courseId !== assignment.courseId) {
+    throw new Error(
+      `Assignment ${assignment.id} references section ${section.id} with courseId ${section.courseId}, but assignment courseId is ${assignment.courseId}.`,
+    );
+  }
+
+  if (section.termId !== assignment.termId) {
+    throw new Error(
+      `Assignment ${assignment.id} references section ${section.id} with termId ${section.termId}, but assignment termId is ${assignment.termId}.`,
+    );
+  }
+
+  if (course.schoolId !== term.schoolId) {
+    throw new Error(
+      `Assignment ${assignment.id} references course ${course.id} from school ${course.schoolId} and term ${term.id} from school ${term.schoolId}.`,
+    );
+  }
+
+  if (course.schoolId !== instructor.schoolId) {
+    throw new Error(
+      `Assignment ${assignment.id} references course ${course.id} from school ${course.schoolId} and instructor ${instructor.id} from school ${instructor.schoolId}.`,
+    );
   }
 
   const yearsOld = Math.max(0, targetYear - term.year);
