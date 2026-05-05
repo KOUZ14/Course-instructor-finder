@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 
 export default [
   {
-    ignores: ["dist", "coverage", "playwright-report", "test-results"],
+    ignores: [".vite", "dist", "coverage", "playwright-report", "test-results"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -44,7 +44,7 @@ export default [
     },
   },
   {
-    files: ["scripts/**/*.{js,mjs,ts}"],
+    files: ["server*.mjs", "scripts/**/*.{js,mjs,ts}"],
     languageOptions: {
       globals: globals.node,
     },
