@@ -120,7 +120,7 @@ export default function App() {
       </section>
 
       <section className="results-panel" aria-live="polite" aria-label="Prediction results">
-        <ResultsContent mode={mode} response={response} />
+        <ResultsContent response={response} />
       </section>
     </main>
   );
@@ -129,7 +129,7 @@ export default function App() {
 /**
  * Renders the result list or the appropriate empty state for the current search.
  */
-function ResultsContent({ mode, response }: { mode: MeetingMode | ""; response: PredictionResponse | undefined }) {
+function ResultsContent({ response }: { response: PredictionResponse | undefined }) {
   if (!response) {
     return (
       <p className="empty-state">Search for a course to see likely instructors and the evidence behind each result.</p>
@@ -140,22 +140,9 @@ function ResultsContent({ mode, response }: { mode: MeetingMode | ""; response: 
     return <p className="empty-state">{response.message}</p>;
   }
 
-  const visibleResults = mode
-    ? response.results
-        .map((result) => ({
-          ...result,
-          evidence: result.evidence.filter((row) => row.mode === mode),
-        }))
-        .filter((result) => result.evidence.length > 0)
-    : response.results;
-
-  if (visibleResults.length === 0) {
-    return <p className="empty-state">No likely instructors match the selected meeting mode in the current dataset.</p>;
-  }
-
   return (
     <div className="results-list">
-      {visibleResults.map((result) => (
+      {response.results.map((result) => (
         <article className="result-card" key={result.instructorId}>
           <div className="result-header">
             <div>

@@ -16,7 +16,9 @@ describe("App", () => {
 
     expect(screen.getByText("Taylor Nguyen")).toBeInTheDocument();
     expect(screen.getByText("High confidence")).toBeInTheDocument();
-    expect(screen.getByText(/Fall 2025/)).toBeInTheDocument();
+    expect(screen.getByText("Rivera Patel")).toBeInTheDocument();
+    expect(screen.getByText("Fall 2025: CS 146 section 02, online, T 18:00-20:45")).toBeInTheDocument();
+    expect(screen.getAllByText(/Fall 2025/)).toHaveLength(2);
   });
 
   it("shows validation messages when required fields are blank", async () => {
