@@ -9,6 +9,12 @@ afterEach(() => {
 });
 
 describe("App", () => {
+  it("states that the current dataset only supports SJSU", () => {
+    render(<App />);
+
+    expect(screen.getByText(/Currently supports San Jose State University \(SJSU\) only\./)).toBeInTheDocument();
+  });
+
   it("shows likely instructors and evidence for CS 146", async () => {
     render(<App />);
     const user = userEvent.setup();

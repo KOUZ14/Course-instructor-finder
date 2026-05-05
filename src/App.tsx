@@ -105,7 +105,10 @@ export default function App() {
 
         <div className="hero-copy">
           <h1 id="page-title">Find likely instructors before registration.</h1>
-          <p className="intro-copy">Search a course and compare the historical evidence behind each prediction.</p>
+          <p className="intro-copy">
+            Search a course and compare the historical evidence behind each prediction. Currently supports San Jose
+            State University (SJSU) only.
+          </p>
         </div>
       </section>
 
