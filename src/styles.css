@@ -138,6 +138,11 @@ h1 {
   font-size: 1.05rem;
 }
 
+.error-state {
+  color: #a4382f;
+  font-weight: 700;
+}
+
 .results-list {
   display: grid;
   gap: 16px;

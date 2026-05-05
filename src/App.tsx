@@ -8,6 +8,7 @@ const DEFAULT_SCHOOL_ID = "sjsu";
 const DEFAULT_TERM_ID = "sjsu-2026-fall";
 const DEFAULT_DAYS = ["M", "W"];
 const DEFAULT_START_TIME = "09:00";
+const GENERIC_PREDICTION_ERROR = "We could not generate a prediction right now. Please try again later.";
 
 const meetingModeOptions: { value: MeetingMode | ""; label: string }[] = [
   { value: "", label: "Any mode" },
@@ -15,6 +16,8 @@ const meetingModeOptions: { value: MeetingMode | ""; label: string }[] = [
   { value: "online", label: "Online" },
   { value: "hybrid", label: "Hybrid" },
 ];
+
+const selectableMeetingModes = new Set<MeetingMode>(["in-person", "online", "hybrid", "unknown"]);
 
 /**
  * Renders the student-facing course search and instructor prediction results.
@@ -26,6 +29,7 @@ export default function App() {
   const [mode, setMode] = useState<MeetingMode | "">("in-person");
   const [errors, setErrors] = useState<SearchValidationErrors>({});
   const [response, setResponse] = useState<PredictionResponse | undefined>();
+  const [predictionError, setPredictionError] = useState<string | undefined>();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,11 +47,19 @@ export default function App() {
     if (!parsed.ok) {
       setErrors(parsed.errors);
       setResponse(undefined);
+      setPredictionError(undefined);
       return;
     }
 
     setErrors({});
-    setResponse(predictInstructors(dataset, parsed.query));
+    setPredictionError(undefined);
+
+    try {
+      setResponse(predictInstructors(dataset, parsed.query));
+    } catch (error: unknown) {
+      setResponse(undefined);
+      setPredictionError(formatPredictionError(error));
+    }
   }
 
   return (
@@ -106,7 +118,7 @@ export default function App() {
 
           <label className="form-field">
             <span>Mode</span>
-            <select value={mode} onChange={(event) => setMode(event.target.value as MeetingMode | "")}>
+            <select value={mode} onChange={(event) => setMode(parseModeSelectValue(event.target.value))}>
               {meetingModeOptions.map((option) => (
                 <option key={option.value || "any"} value={option.value}>
                   {option.label}
@@ -120,7 +132,7 @@ export default function App() {
       </section>
 
       <section className="results-panel" aria-live="polite" aria-label="Prediction results">
-        <ResultsContent response={response} />
+        <ResultsContent predictionError={predictionError} response={response} />
       </section>
     </main>
   );
@@ -129,7 +141,21 @@ export default function App() {
 /**
  * Renders the result list or the appropriate empty state for the current search.
  */
-function ResultsContent({ response }: { response: PredictionResponse | undefined }) {
+function ResultsContent({
+  predictionError,
+  response,
+}: {
+  predictionError: string | undefined;
+  response: PredictionResponse | undefined;
+}) {
+  if (predictionError) {
+    return (
+      <p className="empty-state error-state" role="alert">
+        {predictionError}
+      </p>
+    );
+  }
+
   if (!response) {
     return (
       <p className="empty-state">Search for a course to see likely instructors and the evidence behind each result.</p>
@@ -183,4 +209,30 @@ function formatTimeRange(startTime: string | undefined, endTime: string | undefi
   if (startTime) return ` starts ${startTime}`;
 
   return ` ends ${endTime}`;
+}
+
+/**
+ * Parses the mode select's string value into the domain meeting-mode type.
+ */
+function parseModeSelectValue(value: string): MeetingMode | "" {
+  if (value === "" || isMeetingMode(value)) {
+    return value;
+  }
+
+  throw new Error(`Unexpected meeting mode selected: ${value}`);
+}
+
+function isMeetingMode(value: string): value is MeetingMode {
+  return selectableMeetingModes.has(value as MeetingMode);
+}
+
+/**
+ * Formats unknown predictor failures for explicit user-facing display.
+ */
+function formatPredictionError(error: unknown): string {
+  if (error instanceof Error) {
+    return `We could not generate a prediction right now. ${error.message}`;
+  }
+
+  return GENERIC_PREDICTION_ERROR;
 }

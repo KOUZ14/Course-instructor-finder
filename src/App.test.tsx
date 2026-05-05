@@ -1,7 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import * as predictor from "./domain/predictor";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("App", () => {
   it("shows likely instructors and evidence for CS 146", async () => {
@@ -44,5 +49,26 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Find likely instructors" }));
 
     expect(screen.getByText("MATH 999 is not available in the current dataset.")).toBeInTheDocument();
+  });
+
+  it("shows an explicit prediction error and clears stale results", async () => {
+    render(<App />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Find likely instructors" }));
+    expect(screen.getByText("Taylor Nguyen")).toBeInTheDocument();
+
+    vi.spyOn(predictor, "predictInstructors").mockImplementationOnce(() => {
+      throw new Error("Target term sjsu-2026-fall is not available in the dataset.");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Find likely instructors" }));
+
+    expect(
+      screen.getByText(
+        "We could not generate a prediction right now. Target term sjsu-2026-fall is not available in the dataset.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Taylor Nguyen")).not.toBeInTheDocument();
   });
 });
