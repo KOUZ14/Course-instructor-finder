@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { CourseDataset } from "../domain/types";
 import { loadDataset, validateCourseDataset } from "./loadDataset";
 
 describe("loadDataset", () => {
@@ -47,7 +48,7 @@ describe("loadDataset", () => {
   });
 
   it("rejects references to missing entities", () => {
-    const dataset = loadDataset();
+    const dataset = cloneBundledDataset();
     dataset.courses[0].schoolId = "missing-school";
 
     expect(() => validateCourseDataset(dataset)).toThrow(
@@ -56,11 +57,45 @@ describe("loadDataset", () => {
   });
 
   it("rejects assignments that disagree with their referenced section", () => {
-    const dataset = loadDataset();
+    const dataset = cloneBundledDataset();
     dataset.teachingAssignments[0].courseId = "sjsu-cs-151";
 
     expect(() => validateCourseDataset(dataset)).toThrow(
       "Invalid teachingAssignments[0]: courseId sjsu-cs-151 does not match section sjsu-cs-146-2025-fall-01 courseId sjsu-cs-146.",
     );
   });
+
+  it("rejects duplicate entity ids", () => {
+    const dataset = cloneBundledDataset();
+    dataset.sections[1].id = dataset.sections[0].id;
+
+    expect(() => validateCourseDataset(dataset)).toThrow(
+      "Invalid sections: duplicate id sjsu-cs-146-2025-fall-01.",
+    );
+  });
+
+  it("rejects sections whose course and term belong to different schools", () => {
+    const dataset = cloneBundledDataset();
+    dataset.schools.push({ id: "other-school", name: "Other School", sourceAdapter: "test-adapter" });
+    dataset.terms[0].schoolId = "other-school";
+    dataset.sections[0].termId = dataset.terms[0].id;
+
+    expect(() => validateCourseDataset(dataset)).toThrow(
+      "Invalid sections[0]: course sjsu-cs-146 belongs to school sjsu but term sjsu-2026-fall belongs to school other-school.",
+    );
+  });
+
+  it("rejects assignments whose referenced entities belong to different schools", () => {
+    const dataset = cloneBundledDataset();
+    dataset.schools.push({ id: "other-school", name: "Other School", sourceAdapter: "test-adapter" });
+    dataset.instructors[0].schoolId = "other-school";
+
+    expect(() => validateCourseDataset(dataset)).toThrow(
+      "Invalid teachingAssignments[0]: instructor sjsu-instructor-taylor-nguyen belongs to school other-school but section sjsu-cs-146-2025-fall-01 belongs to school sjsu.",
+    );
+  });
 });
+
+function cloneBundledDataset(): CourseDataset {
+  return structuredClone(loadDataset());
+}

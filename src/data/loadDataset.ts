@@ -99,11 +99,18 @@ export function validateCourseDataset(value: unknown): CourseDataset {
 }
 
 function validateReferences(dataset: CourseDataset): void {
+  assertUniqueIds("schools", dataset.schools);
+  assertUniqueIds("terms", dataset.terms);
+  assertUniqueIds("courses", dataset.courses);
+  assertUniqueIds("sections", dataset.sections);
+  assertUniqueIds("instructors", dataset.instructors);
+  assertUniqueIds("teachingAssignments", dataset.teachingAssignments);
+
   const schoolIds = new Set(dataset.schools.map((school) => school.id));
   const termsById = new Map(dataset.terms.map((term) => [term.id, term]));
   const coursesById = new Map(dataset.courses.map((course) => [course.id, course]));
   const sectionsById = new Map(dataset.sections.map((section) => [section.id, section]));
-  const instructorIds = new Set(dataset.instructors.map((instructor) => instructor.id));
+  const instructorsById = new Map(dataset.instructors.map((instructor) => [instructor.id, instructor]));
 
   dataset.courses.forEach((course, index) => {
     assertReferencedIdExists(schoolIds, course.schoolId, `courses[${index}].schoolId`, "school");
@@ -114,8 +121,14 @@ function validateReferences(dataset: CourseDataset): void {
   });
 
   dataset.sections.forEach((section, index) => {
-    assertReferencedIdExists(coursesById, section.courseId, `sections[${index}].courseId`, "course");
-    assertReferencedIdExists(termsById, section.termId, `sections[${index}].termId`, "term");
+    const course = assertReferencedEntityExists(coursesById, section.courseId, `sections[${index}].courseId`, "course");
+    const term = assertReferencedEntityExists(termsById, section.termId, `sections[${index}].termId`, "term");
+
+    if (course.schoolId !== term.schoolId) {
+      throw new Error(
+        `Invalid sections[${index}]: course ${course.id} belongs to school ${course.schoolId} but term ${term.id} belongs to school ${term.schoolId}.`,
+      );
+    }
   });
 
   dataset.instructors.forEach((instructor, index) => {
@@ -123,8 +136,8 @@ function validateReferences(dataset: CourseDataset): void {
   });
 
   dataset.teachingAssignments.forEach((assignment, index) => {
-    assertReferencedIdExists(
-      instructorIds,
+    const instructor = assertReferencedEntityExists(
+      instructorsById,
       assignment.instructorId,
       `teachingAssignments[${index}].instructorId`,
       "instructor",
@@ -135,8 +148,18 @@ function validateReferences(dataset: CourseDataset): void {
       `teachingAssignments[${index}].sectionId`,
       "section",
     );
-    assertReferencedIdExists(coursesById, assignment.courseId, `teachingAssignments[${index}].courseId`, "course");
-    assertReferencedIdExists(termsById, assignment.termId, `teachingAssignments[${index}].termId`, "term");
+    const course = assertReferencedEntityExists(
+      coursesById,
+      assignment.courseId,
+      `teachingAssignments[${index}].courseId`,
+      "course",
+    );
+    const term = assertReferencedEntityExists(
+      termsById,
+      assignment.termId,
+      `teachingAssignments[${index}].termId`,
+      "term",
+    );
 
     if (assignment.courseId !== section.courseId) {
       throw new Error(
@@ -149,6 +172,30 @@ function validateReferences(dataset: CourseDataset): void {
         `Invalid teachingAssignments[${index}]: termId ${assignment.termId} does not match section ${section.id} termId ${section.termId}.`,
       );
     }
+
+    if (course.schoolId !== term.schoolId) {
+      throw new Error(
+        `Invalid teachingAssignments[${index}]: course ${course.id} belongs to school ${course.schoolId} but term ${term.id} belongs to school ${term.schoolId}.`,
+      );
+    }
+
+    if (instructor.schoolId !== course.schoolId) {
+      throw new Error(
+        `Invalid teachingAssignments[${index}]: instructor ${instructor.id} belongs to school ${instructor.schoolId} but section ${section.id} belongs to school ${course.schoolId}.`,
+      );
+    }
+  });
+}
+
+function assertUniqueIds(collectionName: string, records: readonly { id: string }[]): void {
+  const seenIds = new Set<string>();
+
+  records.forEach((record) => {
+    if (seenIds.has(record.id)) {
+      throw new Error(`Invalid ${collectionName}: duplicate id ${record.id}.`);
+    }
+
+    seenIds.add(record.id);
   });
 }
 
