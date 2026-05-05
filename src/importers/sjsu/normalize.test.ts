@@ -27,6 +27,213 @@ describe("parseSjsuScheduleHtml", () => {
     ]);
   });
 
+  it("extracts rows from the official SJSU schedule table shape", () => {
+    const html = `
+      <table>
+        <thead>
+          <tr>
+            <th>Section</th>
+            <th>Class Number</th>
+            <th>Mode of Instruction</th>
+            <th>Course Title</th>
+            <th>Satisfies</th>
+            <th>Units</th>
+            <th>Type</th>
+            <th>Days</th>
+            <th>Times</th>
+            <th>Instructor</th>
+            <th>Location</th>
+            <th>Dates</th>
+            <th>Open Seats</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CS 146 (Section 01)</td>
+            <td>48291</td>
+            <td>In Person</td>
+            <td>Data Structures and Algorithms</td>
+            <td></td>
+            <td>3.0</td>
+            <td>LEC</td>
+            <td>MW</td>
+            <td>09:00AM-10:15AM</td>
+            <td>Taylor Nguyen</td>
+            <td>MacQuarrie Hall</td>
+            <td>08/19/26-12/07/26</td>
+            <td>37</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    expect(parseSjsuScheduleHtml(html)).toEqual([
+      {
+        classNumber: "48291",
+        subject: "CS",
+        catalogNumber: "146",
+        sectionNumber: "01",
+        title: "Data Structures and Algorithms",
+        component: "LEC",
+        mode: "In Person",
+        days: "MW",
+        time: "09:00AM-10:15AM",
+        location: "MacQuarrie Hall",
+        instructor: "Taylor Nguyen",
+      },
+    ]);
+  });
+
+  it("extracts rows with compact official section labels", () => {
+    const html = `
+      <table>
+        <thead>
+          <tr>
+            <th>Section</th>
+            <th>Class Number</th>
+            <th>Mode of Instruction</th>
+            <th>Course Title</th>
+            <th>Satisfies</th>
+            <th>Units</th>
+            <th>Type</th>
+            <th>Days</th>
+            <th>Times</th>
+            <th>Instructor</th>
+            <th>Location</th>
+            <th>Dates</th>
+            <th>Open Seats</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CHAD 196Sec 01</td>
+            <td>48291</td>
+            <td>In Person</td>
+            <td>Field Experience</td>
+            <td></td>
+            <td>3.0</td>
+            <td>LEC</td>
+            <td>MW</td>
+            <td>09:00AM-10:15AM</td>
+            <td>Taylor Nguyen</td>
+            <td>SH 100</td>
+            <td>08/19/26-12/07/26</td>
+            <td>37</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    expect(parseSjsuScheduleHtml(html)[0]).toMatchObject({
+      subject: "CHAD",
+      catalogNumber: "196",
+      sectionNumber: "01",
+    });
+  });
+
+  it("extracts older official rows that omit the satisfies cell", () => {
+    const html = `
+      <table>
+        <thead>
+          <tr>
+            <th>Section</th>
+            <th>Class Number</th>
+            <th>Mode of Instruction</th>
+            <th>Course Title</th>
+            <th>Satisfies</th>
+            <th>Units</th>
+            <th>Type</th>
+            <th>Days</th>
+            <th>Times</th>
+            <th>Instructor</th>
+            <th>Location</th>
+            <th>Dates</th>
+            <th>Open Seats</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>AAS 33A (Section 01)</td>
+            <td>10016</td>
+            <td>In Person</td>
+            <td>Asian Americans in U.S. History I</td>
+            <td>3.0</td>
+            <td>LEC</td>
+            <td>MTWRF</td>
+            <td>09:00AM-12:10PM</td>
+            <td>Soo Choi</td>
+            <td>CL316</td>
+            <td>01/02/20-01/17/20</td>
+            <td>1</td>
+            <td></td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    expect(parseSjsuScheduleHtml(html)[0]).toMatchObject({
+      component: "LEC",
+      days: "MTWRF",
+      time: "09:00AM-12:10PM",
+      instructor: "Soo Choi",
+      location: "CL316",
+    });
+  });
+
+  it("skips official one-cell note rows between class rows", () => {
+    const html = `
+      <table>
+        <thead>
+          <tr>
+            <th>Section</th>
+            <th>Class Number</th>
+            <th>Mode of Instruction</th>
+            <th>Course Title</th>
+            <th>Satisfies</th>
+            <th>Units</th>
+            <th>Type</th>
+            <th>Days</th>
+            <th>Times</th>
+            <th>Instructor</th>
+            <th>Location</th>
+            <th>Dates</th>
+            <th>Open Seats</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CS 146 (Section 80)</td>
+            <td>48291</td>
+            <td>Fully Online</td>
+            <td>Data Structures and Algorithms</td>
+            <td></td>
+            <td>3.0</td>
+            <td>LEC</td>
+            <td>TBA</td>
+            <td>TBA</td>
+            <td>Staff</td>
+            <td>ONLINE</td>
+            <td>08/19/26-12/07/26</td>
+            <td>37</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="14">FULLY ONLINE - NO designated day/time meetings (TBA).</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    expect(parseSjsuScheduleHtml(html)).toHaveLength(1);
+  });
+
   it("throws an explicit error when no schedule table rows exist", () => {
     expect(() => parseSjsuScheduleHtml("<main>No schedule here</main>")).toThrow(
       "Expected an SJSU schedule table with rows, but none were found.",
@@ -185,6 +392,7 @@ describe("normalizeSjsuScheduleRows", () => {
     ["M W", ["M", "W"]],
     ["TuTh", ["T", "R"]],
     ["TR", ["T", "R"]],
+    ["TR TBA", ["T", "R"]],
   ])("normalizes day format %s", (days, expectedDays) => {
     const normalized = normalizeSjsuScheduleRows({
       schoolId: "sjsu",
@@ -270,6 +478,22 @@ describe("normalizeSjsuScheduleRows", () => {
     expect(normalized.teachingAssignments).toHaveLength(2);
   });
 
+  it("uses class number in section ids to preserve duplicate displayed section numbers", () => {
+    const normalized = normalizeSjsuScheduleRows({
+      schoolId: "sjsu",
+      termId: "sjsu-2023-summer",
+      rows: [
+        scheduleRow({ classNumber: "30358", sectionNumber: "01" }),
+        scheduleRow({ classNumber: "31417", sectionNumber: "01" }),
+      ],
+    });
+
+    expect(normalized.sections.map((section) => section.id)).toEqual([
+      "sjsu-cs-146-2023-summer-01-30358",
+      "sjsu-cs-146-2023-summer-01-31417",
+    ]);
+  });
+
   it("prefers hybrid mode when mode text also contains online", () => {
     const normalized = normalizeSjsuScheduleRows({
       schoolId: "sjsu",
@@ -278,6 +502,86 @@ describe("normalizeSjsuScheduleRows", () => {
     });
 
     expect(normalized.sections[0].mode).toBe("hybrid");
+  });
+
+  it("normalizes TBA meeting values to an empty meeting pattern", () => {
+    const normalized = normalizeSjsuScheduleRows({
+      schoolId: "sjsu",
+      termId: "sjsu-2025-fall",
+      rows: [scheduleRow({ days: "TBA", time: "TBA", mode: "Fully Online" })],
+    });
+
+    expect(normalized.sections[0]).toMatchObject({
+      mode: "online",
+      days: [],
+      startTime: undefined,
+      endTime: undefined,
+    });
+  });
+
+  it("normalizes repeated TBA meeting time values to an empty time range", () => {
+    const normalized = normalizeSjsuScheduleRows({
+      schoolId: "sjsu",
+      termId: "sjsu-2026-spring",
+      rows: [scheduleRow({ days: "TBA TBA", time: "TBA  TBA   TBA  TBA", mode: "Fully Online" })],
+    });
+
+    expect(normalized.sections[0]).toMatchObject({
+      days: [],
+      startTime: undefined,
+      endTime: undefined,
+    });
+  });
+
+  it("normalizes repeated TBA meeting values with day labels to an empty time range", () => {
+    const normalized = normalizeSjsuScheduleRows({
+      schoolId: "sjsu",
+      termId: "sjsu-2026-winter",
+      rows: [scheduleRow({ days: "M TBA", time: "M  TBA   TBA  TBA", mode: "Hybrid" })],
+    });
+
+    expect(normalized.sections[0]).toMatchObject({
+      days: ["M"],
+      startTime: undefined,
+      endTime: undefined,
+    });
+  });
+
+  it("normalizes dash meeting time values to an empty time range", () => {
+    const normalized = normalizeSjsuScheduleRows({
+      schoolId: "sjsu",
+      termId: "sjsu-2020-winter",
+      rows: [scheduleRow({ days: "", time: "-", mode: "Fully Online" })],
+    });
+
+    expect(normalized.sections[0]).toMatchObject({
+      days: [],
+      startTime: undefined,
+      endTime: undefined,
+    });
+  });
+
+  it("normalizes repeated hybrid meeting-pattern cells from official SJSU rows", () => {
+    const normalized = normalizeSjsuScheduleRows({
+      schoolId: "sjsu",
+      termId: "sjsu-2026-spring",
+      rows: [
+        scheduleRow({
+          days: "T  T",
+          time: "T  06:00PM-08:45PM   T  06:00PM-08:45PM",
+          instructor: "Douglas Williams / Douglas Williams",
+          mode: "Hybrid",
+        }),
+      ],
+    });
+
+    expect(normalized.sections[0]).toMatchObject({
+      mode: "hybrid",
+      days: ["T"],
+      startTime: "18:00",
+      endTime: "20:45",
+    });
+    expect(normalized.instructors[0].displayName).toBe("Douglas Williams");
   });
 });
 

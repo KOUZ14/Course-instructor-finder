@@ -14,6 +14,30 @@ const EXPECTED_HEADERS = [
   "Instructor",
 ] as const;
 
+const OFFICIAL_HEADERS = [
+  "Section",
+  "Class Number",
+  "Mode of Instruction",
+  "Course Title",
+  "Satisfies",
+  "Units",
+  "Type",
+  "Days",
+  "Times",
+  "Instructor",
+  "Location",
+  "Dates",
+  "Open Seats",
+  "Notes",
+] as const;
+
+type ScheduleTableShape = "legacy" | "official";
+
+interface ScheduleTableMatch {
+  table: HTMLTableElement;
+  shape: ScheduleTableShape;
+}
+
 export interface SjsuScheduleRow {
   classNumber: string;
   subject: string;
@@ -48,9 +72,9 @@ export function parseSjsuScheduleHtml(html: string): SjsuScheduleRow[] {
   const parser = new DOMParser();
   const document = parser.parseFromString(html, "text/html");
   const tables = [...document.querySelectorAll("table")];
-  const table = findScheduleTable(tables);
+  const match = findScheduleTable(tables);
 
-  if (!table) {
+  if (!match) {
     if (tables.length === 0) {
       throw new Error("Expected an SJSU schedule table with rows, but none were found.");
     }
@@ -62,32 +86,24 @@ export function parseSjsuScheduleHtml(html: string): SjsuScheduleRow[] {
     throw new Error(`Expected an SJSU schedule table with headers ${EXPECTED_HEADERS.join(", ")}.`);
   }
 
-  const rows = [...table.querySelectorAll("tbody tr")];
+  const rows = [...match.table.querySelectorAll("tbody tr")];
 
   if (rows.length === 0) {
     throw new Error("Expected an SJSU schedule table with rows, but none were found.");
   }
 
-  return rows.map((row) => {
+  return rows.flatMap((row) => {
     const cells = [...row.querySelectorAll("td")].map((cell) => cell.textContent?.trim() ?? "");
 
-    if (cells.length !== 11) {
-      throw new Error(`Expected 11 schedule columns, received ${cells.length}.`);
+    if (match.shape === "legacy") {
+      return [parseLegacyScheduleCells(cells)];
     }
 
-    return {
-      classNumber: cells[0],
-      subject: cells[1],
-      catalogNumber: cells[2],
-      sectionNumber: cells[3],
-      title: cells[4],
-      component: cells[5],
-      mode: cells[6],
-      days: cells[7],
-      time: cells[8],
-      location: cells[9],
-      instructor: cells[10],
-    };
+    if (isOfficialNoteRow(cells)) {
+      return [];
+    }
+
+    return [parseOfficialScheduleCells(cells)];
   });
 }
 
@@ -104,9 +120,10 @@ export function normalizeSjsuScheduleRows(input: NormalizeSjsuRowsInput): Normal
     const subject = row.subject.trim().toUpperCase();
     const number = row.catalogNumber.trim().toUpperCase();
     const sectionNumber = row.sectionNumber.trim();
+    const classNumber = row.classNumber.trim();
     const courseId = `${input.schoolId}-${subject.toLowerCase()}-${number.toLowerCase()}`;
     const courseKey = `${subject}-${number}`;
-    const sectionId = `${courseId}-${input.termId.replace(`${input.schoolId}-`, "")}-${sectionNumber}`;
+    const sectionId = `${courseId}-${input.termId.replace(`${input.schoolId}-`, "")}-${sectionNumber}-${slugify(classNumber)}`;
     const [startTime, endTime] = parseMeetingTime(row.time);
 
     courses.set(courseId, {
@@ -123,7 +140,7 @@ export function normalizeSjsuScheduleRows(input: NormalizeSjsuRowsInput): Normal
       courseId,
       termId: input.termId,
       sectionNumber,
-      classNumber: row.classNumber.trim(),
+      classNumber,
       componentType: normalizeComponent(row.component),
       mode: normalizeMode(row.mode),
       days: normalizeDays(row.days),
@@ -132,7 +149,7 @@ export function normalizeSjsuScheduleRows(input: NormalizeSjsuRowsInput): Normal
       location: row.location.trim(),
     });
 
-    const instructorName = row.instructor.trim();
+    const instructorName = normalizeInstructorName(row.instructor);
     const instructorSlug = slugify(instructorName);
 
     if (!isPlaceholderInstructor(instructorName) && instructorSlug.length > 0) {
@@ -165,10 +182,10 @@ export function normalizeSjsuScheduleRows(input: NormalizeSjsuRowsInput): Normal
 function normalizeComponent(component: string): ComponentType {
   const value = component.trim().toLowerCase();
 
-  if (value.includes("lecture")) return "lecture";
-  if (value.includes("lab")) return "lab";
+  if (value.includes("lecture") || value === "lec") return "lecture";
+  if (value.includes("lab") || value === "lab") return "lab";
   if (value.includes("seminar")) return "seminar";
-  if (value.includes("activity")) return "activity";
+  if (value.includes("activity") || value === "act") return "activity";
 
   return "unknown";
 }
@@ -186,6 +203,11 @@ function normalizeMode(mode: string): MeetingMode {
 function normalizeDays(days: string): string[] {
   const original = days;
   const normalized = days.trim().toUpperCase();
+
+  if (normalized === "" || normalized === "TBA") {
+    return [];
+  }
+
   const tokens: string[] = [];
   let index = 0;
 
@@ -204,6 +226,11 @@ function normalizeDays(days: string): string[] {
       continue;
     }
 
+    if (remaining.startsWith("TBA")) {
+      index += 3;
+      continue;
+    }
+
     if (remaining.startsWith("TU")) {
       tokens.push("T");
       index += 2;
@@ -219,17 +246,41 @@ function normalizeDays(days: string): string[] {
     throw new Error(`Unsupported SJSU day value "${original}".`);
   }
 
-  return tokens;
+  return [...new Set(tokens)];
 }
 
-function parseMeetingTime(time: string): [string, string] {
-  const parts = time.split(/\s*[-\u2013\u2014]\s*/);
+function parseMeetingTime(time: string): [string | undefined, string | undefined] {
+  const normalized = time.trim().toUpperCase();
+
+  if (normalized === "" || normalized === "TBA" || normalized === "-" || isOnlyTbaAndDayTokens(normalized)) {
+    return [undefined, undefined];
+  }
+
+  const timeRange = extractFirstMeetingTimeRange(time);
+  const parts = timeRange.split(/\s*[-\u2013\u2014]\s*/);
 
   if (parts.length !== 2 || parts.some((part) => part.trim().length === 0)) {
     throw new Error(`Unsupported SJSU meeting time "${time}".`);
   }
 
   return [parseTimePart(parts[0], time), parseTimePart(parts[1], time)];
+}
+
+function extractFirstMeetingTimeRange(time: string): string {
+  const match = time.match(/\d{1,2}:\d{2}\s*(?:[AP]M)?\s*[-\u2013\u2014]\s*\d{1,2}:\d{2}\s*(?:[AP]M)?/i);
+
+  if (!match) {
+    return time;
+  }
+
+  return match[0];
+}
+
+function isOnlyTbaAndDayTokens(value: string): boolean {
+  return value
+    .split(/\s+/)
+    .filter((token) => token.length > 0)
+    .every((token) => token === "TBA" || ["M", "T", "W", "R", "F", "S", "TU", "TH"].includes(token));
 }
 
 function parseTimePart(value: string, original: string): string {
@@ -264,21 +315,143 @@ function parseTimePart(value: string, original: string): string {
   return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 }
 
-function findScheduleTable(tables: HTMLTableElement[]): HTMLTableElement | undefined {
-  return tables.find((table) => {
+function parseLegacyScheduleCells(cells: string[]): SjsuScheduleRow {
+  if (cells.length !== EXPECTED_HEADERS.length) {
+    throw new Error(`Expected ${EXPECTED_HEADERS.length} schedule columns, received ${cells.length}.`);
+  }
+
+  return {
+    classNumber: cells[0],
+    subject: cells[1],
+    catalogNumber: cells[2],
+    sectionNumber: cells[3],
+    title: cells[4],
+    component: cells[5],
+    mode: cells[6],
+    days: cells[7],
+    time: cells[8],
+    location: cells[9],
+    instructor: cells[10],
+  };
+}
+
+function parseOfficialScheduleCells(cells: string[]): SjsuScheduleRow {
+  if (cells.length !== OFFICIAL_HEADERS.length) {
+    throw new Error(`Expected ${OFFICIAL_HEADERS.length} official SJSU schedule columns, received ${cells.length}.`);
+  }
+
+  const section = parseOfficialSection(cells[0]);
+  const hasShiftedLegacyCells = looksLikeMeetingTime(cells[7]) && !looksLikeMeetingTime(cells[8]);
+
+  if (hasShiftedLegacyCells) {
+    return {
+      classNumber: cells[1],
+      subject: section.subject,
+      catalogNumber: section.catalogNumber,
+      sectionNumber: section.sectionNumber,
+      title: cells[3],
+      component: cells[5],
+      mode: cells[2],
+      days: cells[6],
+      time: cells[7],
+      location: cells[9],
+      instructor: cells[8],
+    };
+  }
+
+  return {
+    classNumber: cells[1],
+    subject: section.subject,
+    catalogNumber: section.catalogNumber,
+    sectionNumber: section.sectionNumber,
+    title: cells[3],
+    component: cells[6],
+    mode: cells[2],
+    days: cells[7],
+    time: cells[8],
+    location: cells[10],
+    instructor: cells[9],
+  };
+}
+
+function looksLikeMeetingTime(value: string): boolean {
+  const normalized = value.trim().toUpperCase();
+
+  return (
+    normalized === "TBA" ||
+    normalized === "-" ||
+    /\d{1,2}:\d{2}\s*(?:[AP]M)?\s*[-\u2013\u2014]\s*\d{1,2}:\d{2}/i.test(value)
+  );
+}
+
+function isOfficialNoteRow(cells: string[]): boolean {
+  return cells.length === 1 && cells[0].length > 0;
+}
+
+function parseOfficialSection(value: string): { subject: string; catalogNumber: string; sectionNumber: string } {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(.+?)\s+([A-Z0-9]+[A-Z0-9-]*)\s+\(Section\s+([^)]+)\)$/i);
+
+  if (match) {
+    return {
+      subject: match[1].trim(),
+      catalogNumber: match[2].trim(),
+      sectionNumber: match[3].trim(),
+    };
+  }
+
+  const compactMatch = trimmed.match(/^(.+?)\s+([A-Z0-9]+[A-Z0-9-]*)\s*Sec\s+(.+)$/i);
+
+  if (compactMatch) {
+    return {
+      subject: compactMatch[1].trim(),
+      catalogNumber: compactMatch[2].trim(),
+      sectionNumber: compactMatch[3].trim(),
+    };
+  }
+
+  throw new Error(`Unsupported SJSU section value "${value}".`);
+}
+
+function findScheduleTable(tables: HTMLTableElement[]): ScheduleTableMatch | undefined {
+  for (const table of tables) {
     const headers = [...table.querySelectorAll("thead th")].map((header) => header.textContent?.trim() ?? "");
 
-    return (
+    if (
       headers.length === EXPECTED_HEADERS.length &&
       EXPECTED_HEADERS.every((expectedHeader, index) => headers[index] === expectedHeader)
-    );
-  });
+    ) {
+      return { table, shape: "legacy" };
+    }
+
+    if (
+      headers.length === OFFICIAL_HEADERS.length &&
+      OFFICIAL_HEADERS.every((expectedHeader, index) => headers[index] === expectedHeader)
+    ) {
+      return { table, shape: "official" };
+    }
+  }
+
+  return undefined;
 }
 
 function isPlaceholderInstructor(instructor: string): boolean {
   const value = instructor.trim().toLowerCase();
 
   return value === "" || value === "tba" || value === "staff";
+}
+
+function normalizeInstructorName(instructor: string): string {
+  const names = instructor
+    .split("/")
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0);
+
+  if (names.length > 1 && names.every((name) => name === names[0])) {
+    return names[0];
+  }
+
+  return instructor.trim();
 }
 
 function slugify(value: string): string {

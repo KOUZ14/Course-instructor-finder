@@ -17,11 +17,11 @@ describe("loadDataset", () => {
     const dataset = loadDataset();
 
     expect(dataset.schools).toHaveLength(1);
-    expect(dataset.terms).toHaveLength(4);
-    expect(dataset.courses).toHaveLength(2);
-    expect(dataset.sections).toHaveLength(5);
-    expect(dataset.instructors).toHaveLength(3);
-    expect(dataset.teachingAssignments).toHaveLength(5);
+    expect(dataset.terms).toHaveLength(2);
+    expect(dataset.courses).toHaveLength(2558);
+    expect(dataset.sections).toHaveLength(6424);
+    expect(dataset.instructors).toHaveLength(2192);
+    expect(dataset.teachingAssignments).toHaveLength(6230);
   });
 
   it("loads bundled records with valid references", () => {
@@ -58,10 +58,16 @@ describe("loadDataset", () => {
 
   it("rejects assignments that disagree with their referenced section", () => {
     const dataset = cloneBundledDataset();
-    dataset.teachingAssignments[0].courseId = "sjsu-cs-151";
+    const assignment = dataset.teachingAssignments[0];
+    const section = dataset.sections.find((candidate) => candidate.id === assignment.sectionId);
+    const otherCourse = dataset.courses.find((candidate) => candidate.id !== section?.courseId);
+
+    expect(section).toBeDefined();
+    expect(otherCourse).toBeDefined();
+    assignment.courseId = otherCourse?.id ?? assignment.courseId;
 
     expect(() => validateCourseDataset(dataset)).toThrow(
-      "Invalid teachingAssignments[0]: courseId sjsu-cs-151 does not match section sjsu-cs-146-2025-fall-01 courseId sjsu-cs-146.",
+      `Invalid teachingAssignments[0]: courseId ${otherCourse?.id} does not match section ${section?.id} courseId ${section?.courseId}.`,
     );
   });
 
@@ -69,9 +75,7 @@ describe("loadDataset", () => {
     const dataset = cloneBundledDataset();
     dataset.sections[1].id = dataset.sections[0].id;
 
-    expect(() => validateCourseDataset(dataset)).toThrow(
-      "Invalid sections: duplicate id sjsu-cs-146-2025-fall-01.",
-    );
+    expect(() => validateCourseDataset(dataset)).toThrow(`Invalid sections: duplicate id ${dataset.sections[0].id}.`);
   });
 
   it("rejects sections whose course and term belong to different schools", () => {
@@ -81,17 +85,22 @@ describe("loadDataset", () => {
     dataset.sections[0].termId = dataset.terms[0].id;
 
     expect(() => validateCourseDataset(dataset)).toThrow(
-      "Invalid sections[0]: course sjsu-cs-146 belongs to school sjsu but term sjsu-2026-fall belongs to school other-school.",
+      `Invalid sections[0]: course ${dataset.sections[0].courseId} belongs to school sjsu but term ${dataset.terms[0].id} belongs to school other-school.`,
     );
   });
 
   it("rejects assignments whose referenced entities belong to different schools", () => {
     const dataset = cloneBundledDataset();
     dataset.schools.push({ id: "other-school", name: "Other School", sourceAdapter: "test-adapter" });
+    const assignmentIndex = dataset.teachingAssignments.findIndex(
+      (assignment) => assignment.instructorId === dataset.instructors[0].id,
+    );
+    const assignment = dataset.teachingAssignments[assignmentIndex];
+    const section = dataset.sections.find((candidate) => candidate.id === assignment.sectionId);
     dataset.instructors[0].schoolId = "other-school";
 
     expect(() => validateCourseDataset(dataset)).toThrow(
-      "Invalid teachingAssignments[0]: instructor sjsu-instructor-taylor-nguyen belongs to school other-school but section sjsu-cs-146-2025-fall-01 belongs to school sjsu.",
+      `Invalid teachingAssignments[${assignmentIndex}]: instructor ${dataset.instructors[0].id} belongs to school other-school but section ${section?.id} belongs to school sjsu.`,
     );
   });
 });

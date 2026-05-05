@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { loadDataset } from "../data/loadDataset";
+import type { CourseDataset } from "./types";
 import { predictInstructors } from "./predictor";
 
 describe("predictInstructors", () => {
   it("ranks likely instructors with evidence for a course-first SJSU search", () => {
-    const response = predictInstructors(loadDataset(), {
+    const response = predictInstructors(sampleDataset(), {
       schoolId: "sjsu",
       termId: "sjsu-2026-fall",
       subject: "CS",
@@ -26,7 +26,7 @@ describe("predictInstructors", () => {
   });
 
   it("returns course_not_found when the course is absent", () => {
-    const response = predictInstructors(loadDataset(), {
+    const response = predictInstructors(sampleDataset(), {
       schoolId: "sjsu",
       termId: "sjsu-2026-fall",
       subject: "MATH",
@@ -41,7 +41,7 @@ describe("predictInstructors", () => {
   });
 
   it("returns no_historical_instructor_data when no assignments exist", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
     const response = predictInstructors(
       {
         ...dataset,
@@ -64,7 +64,7 @@ describe("predictInstructors", () => {
 
   it("throws an explicit error when the target term is absent", () => {
     expect(() =>
-      predictInstructors(loadDataset(), {
+      predictInstructors(sampleDataset(), {
         schoolId: "sjsu",
         termId: "sjsu-2099-fall",
         subject: "CS",
@@ -75,7 +75,7 @@ describe("predictInstructors", () => {
 
   it("throws an explicit error for an absent target term before checking course availability", () => {
     expect(() =>
-      predictInstructors(loadDataset(), {
+      predictInstructors(sampleDataset(), {
         schoolId: "sjsu",
         termId: "sjsu-2099-fall",
         subject: "MATH",
@@ -85,7 +85,7 @@ describe("predictInstructors", () => {
   });
 
   it("throws an explicit error when the target term belongs to another school", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
 
     expect(() =>
       predictInstructors(
@@ -106,7 +106,7 @@ describe("predictInstructors", () => {
   });
 
   it("throws an explicit error for an absent target term before checking assignment availability", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
 
     expect(() =>
       predictInstructors(
@@ -125,7 +125,7 @@ describe("predictInstructors", () => {
   });
 
   it("throws an explicit error when an assignment references a missing section", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
     const assignment = dataset.teachingAssignments.find((candidate) => candidate.id === "ta-cs146-fall2025-01");
 
     expect(assignment).toBeDefined();
@@ -148,7 +148,7 @@ describe("predictInstructors", () => {
   });
 
   it("throws an explicit error when an assignment references a missing term", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
 
     expect(() =>
       predictInstructors(
@@ -169,7 +169,7 @@ describe("predictInstructors", () => {
   });
 
   it("throws an explicit error when an assignment references a missing instructor", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
 
     expect(() =>
       predictInstructors(
@@ -192,7 +192,7 @@ describe("predictInstructors", () => {
   });
 
   it("throws an explicit error when a searched-course section has an assignment with a missing course", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
 
     expect(() =>
       predictInstructors(
@@ -213,7 +213,7 @@ describe("predictInstructors", () => {
   });
 
   it("throws an explicit error when a searched-course section has an assignment with the wrong course", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
 
     expect(() =>
       predictInstructors(
@@ -236,7 +236,7 @@ describe("predictInstructors", () => {
   });
 
   it("throws an explicit error when assignment and section course ids differ", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
 
     expect(() =>
       predictInstructors(
@@ -259,7 +259,7 @@ describe("predictInstructors", () => {
   });
 
   it("throws an explicit error when assignment and section term ids differ", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
 
     expect(() =>
       predictInstructors(
@@ -282,7 +282,7 @@ describe("predictInstructors", () => {
   });
 
   it("throws an explicit error when referenced course and term schools differ", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
 
     expect(() =>
       predictInstructors(
@@ -305,7 +305,7 @@ describe("predictInstructors", () => {
   });
 
   it("throws an explicit error when referenced course and instructor schools differ", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
 
     expect(() =>
       predictInstructors(
@@ -330,7 +330,7 @@ describe("predictInstructors", () => {
   });
 
   it("returns cloned evidence days so result mutation does not mutate the dataset", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
     const response = predictInstructors(dataset, {
       schoolId: "sjsu",
       termId: "sjsu-2026-fall",
@@ -354,7 +354,7 @@ describe("predictInstructors", () => {
   });
 
   it("returns insufficient_evidence when historical assignments score below the threshold", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
     const response = predictInstructors(
       {
         ...dataset,
@@ -389,7 +389,7 @@ describe("predictInstructors", () => {
   });
 
   it("does not count duplicate day tokens as a meeting pattern match", () => {
-    const dataset = loadDataset();
+    const dataset = sampleDataset();
     const response = predictInstructors(
       {
         ...dataset,
@@ -413,3 +413,149 @@ describe("predictInstructors", () => {
     expect(response.results[0].factors.meetingPatternMatch).toBe(0);
   });
 });
+
+function sampleDataset(): CourseDataset {
+  return {
+    schools: [{ id: "sjsu", name: "San Jose State University", sourceAdapter: "sjsu-static-v1" }],
+    terms: [
+      { id: "sjsu-2026-fall", schoolId: "sjsu", code: "2268", label: "Fall 2026", year: 2026, season: "fall" },
+      { id: "sjsu-2025-fall", schoolId: "sjsu", code: "2258", label: "Fall 2025", year: 2025, season: "fall" },
+      {
+        id: "sjsu-2025-spring",
+        schoolId: "sjsu",
+        code: "2252",
+        label: "Spring 2025",
+        year: 2025,
+        season: "spring",
+      },
+      { id: "sjsu-2024-fall", schoolId: "sjsu", code: "2248", label: "Fall 2024", year: 2024, season: "fall" },
+    ],
+    courses: [
+      {
+        id: "sjsu-cs-146",
+        schoolId: "sjsu",
+        subject: "CS",
+        number: "146",
+        title: "Data Structures and Algorithms",
+        courseKey: "CS-146",
+      },
+      {
+        id: "sjsu-cs-151",
+        schoolId: "sjsu",
+        subject: "CS",
+        number: "151",
+        title: "Object-Oriented Design",
+        courseKey: "CS-151",
+      },
+    ],
+    sections: [
+      {
+        id: "sjsu-cs-146-2025-fall-01",
+        courseId: "sjsu-cs-146",
+        termId: "sjsu-2025-fall",
+        sectionNumber: "01",
+        classNumber: "48291",
+        componentType: "lecture",
+        mode: "in-person",
+        days: ["M", "W"],
+        startTime: "09:00",
+        endTime: "10:15",
+        location: "MacQuarrie Hall",
+      },
+      {
+        id: "sjsu-cs-146-2025-fall-02",
+        courseId: "sjsu-cs-146",
+        termId: "sjsu-2025-fall",
+        sectionNumber: "02",
+        classNumber: "48292",
+        componentType: "lecture",
+        mode: "online",
+        days: ["T"],
+        startTime: "18:00",
+        endTime: "20:45",
+        location: "Online",
+      },
+      {
+        id: "sjsu-cs-146-2025-spring-01",
+        courseId: "sjsu-cs-146",
+        termId: "sjsu-2025-spring",
+        sectionNumber: "01",
+        classNumber: "28291",
+        componentType: "lecture",
+        mode: "in-person",
+        days: ["M", "W"],
+        startTime: "09:00",
+        endTime: "10:15",
+        location: "MacQuarrie Hall",
+      },
+      {
+        id: "sjsu-cs-146-2024-fall-01",
+        courseId: "sjsu-cs-146",
+        termId: "sjsu-2024-fall",
+        sectionNumber: "01",
+        classNumber: "18291",
+        componentType: "lecture",
+        mode: "in-person",
+        days: ["M", "W"],
+        startTime: "09:00",
+        endTime: "10:15",
+        location: "MacQuarrie Hall",
+      },
+      {
+        id: "sjsu-cs-151-2025-fall-01",
+        courseId: "sjsu-cs-151",
+        termId: "sjsu-2025-fall",
+        sectionNumber: "01",
+        classNumber: "49291",
+        componentType: "lecture",
+        mode: "in-person",
+        days: ["T", "R"],
+        startTime: "10:30",
+        endTime: "11:45",
+        location: "Duncan Hall",
+      },
+    ],
+    instructors: [
+      { id: "sjsu-instructor-taylor-nguyen", schoolId: "sjsu", displayName: "Taylor Nguyen" },
+      { id: "sjsu-instructor-rivera-patel", schoolId: "sjsu", displayName: "Rivera Patel" },
+      { id: "sjsu-instructor-morgan-lee", schoolId: "sjsu", displayName: "Morgan Lee" },
+    ],
+    teachingAssignments: [
+      {
+        id: "ta-cs146-fall2025-01",
+        instructorId: "sjsu-instructor-taylor-nguyen",
+        sectionId: "sjsu-cs-146-2025-fall-01",
+        courseId: "sjsu-cs-146",
+        termId: "sjsu-2025-fall",
+      },
+      {
+        id: "ta-cs146-fall2025-02",
+        instructorId: "sjsu-instructor-rivera-patel",
+        sectionId: "sjsu-cs-146-2025-fall-02",
+        courseId: "sjsu-cs-146",
+        termId: "sjsu-2025-fall",
+      },
+      {
+        id: "ta-cs146-spring2025-01",
+        instructorId: "sjsu-instructor-morgan-lee",
+        sectionId: "sjsu-cs-146-2025-spring-01",
+        courseId: "sjsu-cs-146",
+        termId: "sjsu-2025-spring",
+      },
+      {
+        id: "ta-cs146-fall2024-01",
+        instructorId: "sjsu-instructor-taylor-nguyen",
+        sectionId: "sjsu-cs-146-2024-fall-01",
+        courseId: "sjsu-cs-146",
+        termId: "sjsu-2024-fall",
+      },
+      {
+        id: "ta-cs151-fall2025-01",
+        instructorId: "sjsu-instructor-morgan-lee",
+        sectionId: "sjsu-cs-151-2025-fall-01",
+        courseId: "sjsu-cs-151",
+        termId: "sjsu-2025-fall",
+      },
+    ],
+  };
+}

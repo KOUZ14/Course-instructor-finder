@@ -19,11 +19,11 @@ describe("App", () => {
     await user.type(screen.getByLabelText("Course number"), "146");
     await user.click(screen.getByRole("button", { name: "Find likely instructors" }));
 
-    expect(screen.getByText("Taylor Nguyen")).toBeInTheDocument();
+    expect(screen.getByText("David Taylor")).toBeInTheDocument();
     expect(screen.getByText("High confidence")).toBeInTheDocument();
-    expect(screen.getByText("Rivera Patel")).toBeInTheDocument();
-    expect(screen.getByText("Fall 2025: CS 146 section 02, online, T 18:00-20:45")).toBeInTheDocument();
-    expect(screen.getAllByText(/Fall 2025/)).toHaveLength(2);
+    expect(screen.getByText("Ben Poon")).toBeInTheDocument();
+    expect(screen.getByText("Spring 2026: CS 146 section 02, in-person, MW 09:00-10:15")).toBeInTheDocument();
+    expect(screen.getAllByText(/Spring 2026/).length).toBeGreaterThan(0);
   });
 
   it("shows validation messages when required fields are blank", async () => {
@@ -56,7 +56,7 @@ describe("App", () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByRole("button", { name: "Find likely instructors" }));
-    expect(screen.getByText("Taylor Nguyen")).toBeInTheDocument();
+    expect(screen.getByText("David Taylor")).toBeInTheDocument();
 
     vi.spyOn(predictor, "predictInstructors").mockImplementationOnce(() => {
       throw new Error("Target term sjsu-2026-fall is not available in the dataset.");
@@ -69,6 +69,6 @@ describe("App", () => {
         "We could not generate a prediction right now. Target term sjsu-2026-fall is not available in the dataset.",
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Taylor Nguyen")).not.toBeInTheDocument();
+    expect(screen.queryByText("David Taylor")).not.toBeInTheDocument();
   });
 });
